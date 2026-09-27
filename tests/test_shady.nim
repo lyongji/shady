@@ -1,4 +1,4 @@
-import pixie, shady, vmath, os
+import shady, vmath, os
 
 var masterOutput: string
 proc log(args: varargs[string, `$`]) =
@@ -101,18 +101,10 @@ block:
   var textureAtlasSampler: Uniform[Sampler2d]
   var uv = vec2(0.5, 0.5)
 
-  textureAtlasSampler.image = newImage(100, 100)
-  textureAtlasSampler.image.fill(color(1, 0.5, 0, 1))
-
   proc textureFrag(fragColor: var Vec4) =
     fragColor = texture(textureAtlasSampler, uv)
 
   log toGLSL(textureFrag)
-
-  var c: Vec4
-  textureFrag(c)
-
-  assert (c - vec4(1.0, 0.5, 0.0, 1.0)).length < 0.005
 
 block:
   log "--------------------------------------------------"

@@ -1,12 +1,18 @@
-# Nim to GPU shader language compiler and supporting utilities.
+# Nim to GPU shader language compiler.
 
-Shady can compile a subset of Nim into `OpenGL Shader Language` used by the GPU. This allows you to test your shader code with `echo` statements on the CPU and then run the exact same code on the GPU.
+Shady can compile a subset of Nim into `OpenGL Shader Language` (and HLSL /
+Metal Shading Language) used by the GPU. This lets you test your shader code
+with `echo` statements on the CPU and then compile the exact same code to a
+GPU shader.
 
 `nimble install shady`
 
 ![Github Actions](https://github.com/treeform/shady/workflows/Github%20Actions/badge.svg)
 
 [API reference](https://treeform.github.io/shady)
+
+This branch contains **only the shader compiler**. There is no window, image
+or graphics runtime dependency: the compiler emits shader source strings.
 
 Shady has two main goals:
 
@@ -15,89 +21,26 @@ Shady has two main goals:
 
 Currently supported shader types:
 
-* Fragment/pixel shaders, including shader-toy style fullscreen examples.
+* Fragment/pixel shaders.
 * Vertex shaders paired with fragment shaders for the traditional graphics pipeline.
 * Compute shaders for GPU data processing.
 
 Current shader targets:
 
 * Desktop GLSL 4.10 via `glsl4Desktop` / `glslDesktop` for OpenGL 4.1+.
-* Desktop GLSL 3.30 via `glsl3Desktop` for older desktop OpenGL tests.
+* Desktop GLSL 3.30 via `glsl3Desktop` for older desktop OpenGL.
 * GLSL ES 3.0 via `glsl3WebGL` / `glslES3` for OpenGL ES 3.0 / WebGL 2.0.
+* Vulkan GLSL 4.50 via `vulkanGlsl450`.
 * HLSL via `hlslDX12` for DirectX 12.
 * Metal Shading Language via `metalMSL`.
 
 Use `toShader(shaderProc, target, stage)` for the general backend switch, or
 `toGLSL`, `toHLSL`, and `toMSL` for language-specific helpers.
 
-Runtime backend tests are separate so platform graphics dependencies stay
-optional:
-
-```sh
-nimble test
-nim c -r -d:shadyRunOpenGL tests/test_opengl_glsl3.nim
-nim c -r -d:shadyRunOpenGL tests/test_opengl_glsl4.nim
-nim c -r --path:C:\p\dx12\src -d:shadyRunDx12 tests/test_directx.nim
-nim c -r --path:/path/to/metal4/src -d:shadyRunMetal tests/test_metal.nim
-```
-
 Shady uses:
-* `pixie` library for image operations.
 * `vmath` library for vector and matrix operations.
-* `chroma` library for color conversions and operations.
-* `bumpy` library for collisions and intersections.
-
-# Using Shady shader toy playground:
-
-![circle example](docs/circle.png)
-
-```nim
-import shady, vmath, shady/demo
-
-# both CPU and GPU code:
-proc circleSmooth(fragColor: var Vec4, uv: Vec2, time: Uniform[float32]) =
-  var a = 0.0
-  var radius = 300.0 + 100 * sin(time)
-  for x in 0 ..< 8:
-    for y in 0 ..< 8:
-      if (uv + vec2(x.float32 - 4.0, y.float32 - 4.0) / 8.0).length < radius:
-        a += 1
-  a = a / (8 * 8)
-  fragColor = vec4(a, a, a, 1)
-
-# test on the CPU:
-var testColor: Vec4
-circleSmooth(testColor, vec2(100, 100), 0.0)
-echo testColor
-
-# compile to a GPU shader:
-var shader = toGLSL(circleSmooth)
-echo shader
-
-# run the GPU shader and display it in a window:
-run("Circle", shader)
-```
-
-[See the source](examples/circle.nim)
-
-![mandelbrot example](docs/mandelbrot.png)
-
-[See the source](examples/mandelbrot.nim)
-
-![colors example](docs/colors.png)
-
-[See the Source](examples/colors.nim)
-
-![flare example](docs/flare.png)
-
-[See the Source](examples/flare.nim)
-
 
 # Using Shady as a shader generator:
-
-![triangle example](docs/triangle.png)
-
-[See the source](examples/triangle.nim)
 
 Nim vertex shader:
 ```nim
@@ -146,9 +89,15 @@ void main() {
 }
 ```
 
+The same Nim proc can also be executed on the CPU with plain Nim, which makes
+it easy to test shader logic with `echo` and asserts before compiling it to a
+GPU shader.
+
 # Using Shady to write compute shaders:
 
-Shady can be used to write compute shaders. Compute shaders allow more general purpose code execution work in parallel and are often faster than the CPU for this kind of workload.
+Shady can be used to write compute shaders. Compute shaders allow more general
+purpose code execution work in parallel and are often faster than the CPU for
+this kind of workload.
 
 ```nim
 # Setup the uniforms.
@@ -172,12 +121,6 @@ proc commandsToImage() =
     imageStore(outputImageBuffer, int32(pos.y * uint32(dimensions.x) + pos.x), colorValue)
 ```
 
-#### GPU:
-
-![flare example](examples/compute1_output_gpu.png)
-
-#### CPU:
-
-![flare example](examples/compute1_output_cpu.png)
-
-[See the Source](examples/compute1.nim)
+Image-backed sampler types (`Sampler2d`, `ImageBuffer`, ...) are opaque on the
+CPU, so shaders that use them still compile to GLSL/HLSL/MSL but their CPU
+stubs return default values.

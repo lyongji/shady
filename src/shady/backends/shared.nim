@@ -1,8 +1,7 @@
 ## Shader macro, converts Nim code into shader source.
 
-import macros, pixie, strutils, tables, vmath
+import macros, strutils, tables, vmath
 import shady/backends/[glsl, glsl3, glsl4, dx12, metal4, vulkan]
-from chroma import ColorRGBX
 
 type
   ShaderTarget* = enum
@@ -1550,26 +1549,19 @@ type
   SamplerBuffer* = object
     data*: seq[float32]
 
+  # Image-backed sampler types are opaque on the CPU: only their type names
+  # matter when compiling to a shader, so pixie/chroma are not needed.
   ImageBuffer* = object
-    image*: Image
-
   UImageBuffer* = object
-    image*: Image
-
   Sampler2d* = object
-    image*: Image
-
   SamplerCube* = object
-    faces*: array[6, Image]
-
   Sampler2dShadow* = object
-    image*: Image
-
   USampler2d* = object
-    image*: Image
-
   Sampler2dArray* = object
-    images*: seq[Image]
+
+  # Minimal packed vertex color type, mapped to vec4 by the compiler.
+  ColorRGBX* = object
+    r*, g*, b*, a*: uint8
 
 var
   ## GLSL globals.
@@ -1612,8 +1604,8 @@ proc texelFetch*(buffer: Uniform[SamplerBuffer], index: SomeInteger): Vec4 =
   vec4(buffer.data[index.int], 0, 0, 0)
 
 proc texelFetch*(buffer: Uniform[Sampler2D], pos: IVec2, level: int): Vec4 =
-  let c = buffer.image[pos.x.int, pos.y.int]
-  return vec4(c.r.float32/255, c.g.float32/255, c.b.float32/255, c.a.float32/255)
+  ## CPU stub: no image data is available without pixie.
+  vec4(0, 0, 0, 0)
 
 proc texelFetch*(buffer: Uniform[USampler2D], pos: IVec2, level: int): UVec4 =
   ## CPU stub for usampler2D; not used at runtime. Returns zeros.
@@ -1622,33 +1614,23 @@ proc texelFetch*(buffer: Uniform[USampler2D], pos: IVec2, level: int): UVec4 =
 proc imageLoad*(
   buffer: var UniformWriteOnly[UImageBuffer], index: int32
 ): UVec4 =
-  result.x = buffer.image.data[index.int].r
-  result.g = buffer.image.data[index.int].g
-  result.b = buffer.image.data[index.int].b
-  result.a = buffer.image.data[index.int].a
+  ## CPU stub: no image data is available without pixie.
+  uvec4(0u32, 0u32, 0u32, 0u32)
 
 proc imageStore*(buffer: var UniformWriteOnly[UImageBuffer], index: int32,
     color: UVec4) =
-  buffer.image.data[index.int].r = clamp(color.x, 0, 255).uint8
-  buffer.image.data[index.int].g = clamp(color.y, 0, 255).uint8
-  buffer.image.data[index.int].b = clamp(color.z, 0, 255).uint8
-  buffer.image.data[index.int].a = clamp(color.w, 0, 255).uint8
+  ## CPU stub: no image data is available without pixie.
+  discard
 
 proc imageStore*(buffer: var UniformWriteOnly[ImageBuffer], index: int32,
     color: Vec4) =
-  buffer.image.data[index.int].r = clamp(color.x*255, 0, 255).uint8
-  buffer.image.data[index.int].g = clamp(color.y*255, 0, 255).uint8
-  buffer.image.data[index.int].b = clamp(color.z*255, 0, 255).uint8
-  buffer.image.data[index.int].a = clamp(color.w*255, 0, 255).uint8
+  ## CPU stub: no image data is available without pixie.
+  discard
 
 proc imageStore*(buffer: var Uniform[Sampler2D], pos: IVec2,
     color: Vec4) =
-  buffer.image[pos.x.int, pos.y.int] = rgbx(
-    clamp(color.x*255, 0, 255).uint8,
-    clamp(color.y*255, 0, 255).uint8,
-    clamp(color.z*255, 0, 255).uint8,
-    clamp(color.w*255, 0, 255).uint8,
-  )
+  ## CPU stub: no image data is available without pixie.
+  discard
 
 proc vec4*(c: ColorRGBX): Vec4 =
   vec4(
@@ -1741,12 +1723,8 @@ proc smoothstep*(a, b, x: Vec4): Vec4 =
   vec4(smoothstep(a.x, b.x, x.x), smoothstep(a.y, b.y, x.y), smoothstep(a.z, b.z, x.z), smoothstep(a.w, b.w, x.w))
 
 proc texture*(buffer: Uniform[Sampler2D], pos: Vec2): Vec4 =
-  let pos = pos - vec2(0.5 / buffer.image.width.float32, 0.5 /
-      buffer.image.height.float32)
-  buffer.image.getRgbaSmooth(
-    ((pos.x mod 1.0) * buffer.image.width.float32),
-    ((pos.y mod 1.0) * buffer.image.height.float32)
-  ).vec4()
+  ## CPU stub: no image data is available without pixie.
+  vec4(0, 0, 0, 1)
 
 proc texture*(buffer: Uniform[SamplerCube], pos: Vec3): Vec4 =
   ## CPU stub for samplerCube; not used at runtime. Returns opaque black.
@@ -1764,14 +1742,16 @@ proc reflect*(incident, normal: Vec3): Vec3 =
   incident - 2.0'f * dot(normal, incident) * normal
 
 proc textureSize*(buffer: Uniform[Sampler2D], level: int): Vec2 =
-  vec2(buffer.image.width.float32, buffer.image.height.float32)
+  ## CPU stub: no image data is available without pixie.
+  vec2(0, 0)
 
 proc textureSize*(buffer: Uniform[SamplerCube], level: int): Vec2 =
-  let image = buffer.faces[0]
-  vec2(image.width.float32, image.height.float32)
+  ## CPU stub: no image data is available without pixie.
+  vec2(0, 0)
 
 proc textureSize*(buffer: Uniform[Sampler2dShadow], level: int): Vec2 =
-  vec2(buffer.image.width.float32, buffer.image.height.float32)
+  ## CPU stub: no image data is available without pixie.
+  vec2(0, 0)
 
 proc textureGrad*(
   s: Uniform[Sampler2D],
